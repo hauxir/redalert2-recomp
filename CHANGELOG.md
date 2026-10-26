@@ -5,6 +5,13 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- A retail `gamemd.exe` or `game.exe` (the same build as Steam's, with its
+  launcher check intact) exited at once with "Launcher not running....Bail!"
+  (it looks for `RA2MD.exe`'s mutex). The lift now stubs the launcher check
+  and the launcher notify to return success, as the Steam build's own code
+  does (`run_lift.py`, `LAUNCHER_SITES`).
+
 ## [0.1.1] - 2026-10-24
 
 ### Added
