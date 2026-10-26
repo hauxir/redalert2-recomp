@@ -6,6 +6,10 @@ versions follow [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- Native build: closing the window, Cmd+Q or Quit in the Dock left the process
+  running with no window (the game closes its menu on WM_CLOSE and spins
+  without exiting), so the app stayed in the Dock until force-quit. The host
+  now gives the game 3 seconds to exit on its own, then exits the process.
 - Native build: with HD vehicles at 3x (`hdvoxels=3` in `ra2.ini`) the game
   crashed at startup, before HD was live: the presenter's fallback compose
   buffer is 2x-sized, and a 3x compose wrote past it. The fallback now runs
