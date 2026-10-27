@@ -185,8 +185,7 @@ build-macos/ra2 --run
 To give the build to another Mac as an app, `tools/package_macos.py` makes
 `dist/<Game>.app` and a zip of it: the host, its libraries copied in and
 relinked, the game's icon, and a launcher that asks for the game folder on
-the first run (`--bundle-game` copies your own game folder in instead, for
-your own machines). Homebrew's libraries run only on the macOS they were
+the first run. Homebrew's libraries run only on the macOS they were
 built on or newer; for an app that runs on any Apple Silicon Mac, build the
 libraries with `tools/deps-macos.sh` first (macOS 11 target, about five
 minutes) and build the host against them:

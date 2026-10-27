@@ -5,18 +5,15 @@ libraries inside, for people who did not build it.
     .venv/bin/python tools/package_macos.py                      # Yuri's Revenge, from build-macos
     .venv/bin/python tools/package_macos.py --build-dir build-macos-game   # Red Alert 2
 
-Makes dist/<Title>.app and a zip of it beside a README. By default the app
-holds no game data: on first launch it asks for the player's own game folder
-(the one with gamemd.exe or game.exe) and remembers it in ~/Library/Application
-Support. With --bundle-game, your own game folder is copied into the app
-(Contents/game) for carrying the game between your own machines; saves and
-the game's INI files are then written inside the app. The host's ra2.ini and
-mods/ live inside the bundle (Contents/MacOS/ra2.ini, Contents/mods/), as they
-live beside the build on a checkout.
+Makes dist/<Title>.app and a zip of it beside a README. The app holds no game
+data: on first launch it asks for the player's own game folder (the one with
+gamemd.exe or game.exe) and remembers it in ~/Library/Application Support.
+The host's ra2.ini and mods/ live inside the bundle (Contents/MacOS/ra2.ini,
+Contents/mods/), as they live beside the build on a checkout.
 
 Only the Mach-Os are (ad-hoc) signed, as Apple Silicon requires to run them;
-the bundle is not sealed, so the game and settings inside it may change
-without macOS calling the app damaged. It is not notarized: Gatekeeper asks
+the bundle is not sealed, so the settings inside it may change without
+macOS calling the app damaged. It is not notarized: Gatekeeper asks
 for a right-click > Open (or Privacy & Security > Open Anyway) the first time,
 and a freshly downloaded copy must be moved with Finder once before it runs
 from a writable place (App Translocation). The Homebrew libraries carry the
@@ -28,8 +25,9 @@ import argparse, os, plistlib, re, shutil, stat, struct, subprocess, sys, zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BREW = "/opt/homebrew"
 
-TITLES = {"gamemd": ("Yuri's Revenge", "gamemd.exe", "yr", "net.sp00nz.redalert2-recomp.yr"),
-          "game": ("Red Alert 2", "game.exe", "ra2", "net.sp00nz.redalert2-recomp.ra2")}
+# target: title, exe, slug, bundle id, the build the host was lifted from
+TITLES = {"gamemd": ("Yuri's Revenge", "gamemd.exe", "yr", "net.sp00nz.redalert2-recomp.yr", "Yuri's Revenge 1.001"),
+          "game": ("Red Alert 2", "game.exe", "ra2", "net.sp00nz.redalert2-recomp.ra2", "Red Alert 2 1.006")}
 
 
 def run(*cmd, check=True, capture=True):
@@ -236,7 +234,6 @@ SUPPORT="$HOME/Library/Application Support/Red Alert 2 Recomp"
 CONF="$SUPPORT/@SLUG@-game-folder"
 LOG="$HOME/Library/Logs/@TITLE@ (recomp).log"
 mkdir -p "$SUPPORT" "$HOME/Library/Logs"
-BUNDLED="$HERE/../game"
 
 dialog() {   # dialog TEXT [stop]
     osascript - "$TITLE" "$1" "$2" >/dev/null 2>&1 <<'APPLESCRIPT'
@@ -258,11 +255,7 @@ case "$HERE" in */AppTranslocation/*)
     exit 1 ;;
 esac
 
-if has_exe "$BUNDLED"; then
-    GAME=$(cd "$BUNDLED" && pwd)
-else
-    GAME=$(cat "$CONF" 2>/dev/null)
-fi
+GAME=$(cat "$CONF" 2>/dev/null)
 if ! has_exe "$GAME"; then
     dialog "$TITLE needs your own copy of Red Alert 2 (the folder with $EXE, from Steam or the EA App). Choose that folder next; the app will remember it."
     while :; do
@@ -287,7 +280,7 @@ if [ $STATUS -ne 0 ]; then
     case "$TAIL" in
         *"not the build this host was lifted from"*)
             rm -f "$CONF"
-            dialog "The $EXE in $GAME is a different build from the one this app was made from. It needs the Steam or EA App release of Yuri's Revenge 1.001 (or that same build). The folder choice has been forgotten; launch again to pick another.
+            dialog "The $EXE in $GAME is a different build from the one this app was made from. It needs the Steam or EA App release of @BUILD@ (or that same build). The folder choice has been forgotten; launch again to pick another.
 
 $TAIL" stop ;;
         *) dialog "$TITLE stopped (exit $STATUS). The log is at $LOG
@@ -323,29 +316,24 @@ different game folder, delete
 '''
 
 
-GAME_NOTE_OWN = '''It contains no game data. You need your own copy of the game: the folder with
+GAME_NOTE = '''It contains no game data. You need your own copy of the game: the folder with
 {exe} from the Steam or EA App release (Command & Conquer: The Ultimate
 Collection). The app asks for that folder the first time and remembers it.
 Saves, settings and the game's own INI files are written into that folder, so
 keep it somewhere you own, like ~/Games.'''
 
-GAME_NOTE_BUNDLED = '''Your game folder is inside the app (Contents/game), for carrying the game
-between your own machines. Saves, settings and the game's own INI files are
-written there too, so copying the app carries them along.'''
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--build-dir", default="build-macos", help="a built host (build-macos.sh)")
-    ap.add_argument("--game", default="game", help="a game folder, for the icon in its exe (and --bundle-game)")
-    ap.add_argument("--bundle-game", action="store_true", help="copy the --game folder into the app, for your own machines")
+    ap.add_argument("--game", default="game", help="a game folder, for the icon in its exe")
     ap.add_argument("--out", default="dist")
     a = ap.parse_args()
     os.chdir(ROOT)
     cache = open(os.path.join(a.build_dir, "CMakeCache.txt")).read()
     target = re.search(r"RA2_TARGET:STRING=(\w+)", cache)
     target = target.group(1) if target else "gamemd"
-    title, exe_name, slug, ident = TITLES[target]
+    title, exe_name, slug, ident, build = TITLES[target]
     ra2 = os.path.join(a.build_dir, "ra2")
     if not os.path.exists(ra2):
         sys.exit(f"no {ra2}: build first (build-macos.sh)")
@@ -360,15 +348,8 @@ def main():
     shutil.copy2(ra2, os.path.join(contents, "MacOS", "ra2"))
     launcher = os.path.join(contents, "MacOS", "launch")
     with open(launcher, "w") as f:
-        f.write(LAUNCHER.replace("@TITLE@", title).replace("@EXE@", exe_name).replace("@SLUG@", slug))
+        f.write(LAUNCHER.replace("@TITLE@", title).replace("@EXE@", exe_name).replace("@SLUG@", slug).replace("@BUILD@", build))
     os.chmod(launcher, 0o755)
-    if a.bundle_game:
-        src = os.path.realpath(a.game)
-        if not os.path.exists(os.path.join(src, exe_name)):
-            sys.exit(f"no {exe_name} in {src}")
-        print(f"copying {src} into the app...")
-        shutil.copytree(src, os.path.join(contents, "game"), symlinks=False,
-                        ignore=shutil.ignore_patterns("._*", ".DS_Store"))
     open(os.path.join(contents, "mods", slug, "README.txt"), "w").write(
         f"Mods go here, one folder each (docs in the repository's mods/README.md). F9 at the main menu switches.\n")
 
@@ -399,10 +380,10 @@ def main():
         run("codesign", "--verify", "--strict", f)      # each signed in bundle_libs; the bundle itself is not sealed
 
     readme = os.path.join(a.out, f"README - {title}.txt")
-    note = (GAME_NOTE_BUNDLED if a.bundle_game else GAME_NOTE_OWN).format(exe=exe_name)
+    note = GAME_NOTE.format(exe=exe_name)
     open(readme, "w").write(README.format(title=title, underline="=" * (len(title) + 19), exe=exe_name, slug=slug,
                                           minos=minos, game_note=note))
-    zip_path = os.path.join(a.out, f"{title} (recomp) macOS {version}{' with game' if a.bundle_game else ''}.zip")
+    zip_path = os.path.join(a.out, f"{title} (recomp) macOS {version}.zip")
     if os.path.exists(zip_path):
         os.remove(zip_path)
     run("ditto", "-c", "-k", "--keepParent", app, zip_path)
