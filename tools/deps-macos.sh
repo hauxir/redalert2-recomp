@@ -8,7 +8,7 @@
 #   tools/deps-macos.sh                       # ~5 minutes; MACOSX_DEPLOYMENT_TARGET=12.0 for another floor
 #   BUILD_DIR=build-macos-compat CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_BUILD_RPATH=$PWD/deps-macos/lib" \
 #     PKG_CONFIG_PATH=$PWD/deps-macos/lib/pkgconfig ./build-macos.sh
-#   .venv/bin/python tools/package_macos.py --build-dir build-macos-compat [--bundle-game]
+#   .venv/bin/python tools/package_macos.py --build-dir build-macos-compat
 #
 # ffmpeg is cut down to what the host decodes: Bink video and audio (the
 # movies) and MP3 (the music, mss.c). Needs cmake, ninja and curl.
